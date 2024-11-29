@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mad Out 2D Prototype</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            z-index: 10;
+        }
+        .car-option {
+            margin: 10px;
+            padding: 10px 20px;
+            background: #ff4d4d;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .car-option:hover {
+            background: orange;
+        }
+    </style>
+</head>
+<body>
+<div id="menu">
+    <h1>Select Your Car</h1>
+    <div class="car-option" data-color="red">Car 1 (Red)</div>
+    <div class="car-option" data-color="blue">Car 2 (Blue)</div>
+    <div class="car-option" data-color="green">Car 3 (Green)</div>
+</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const menu = document.getElementById("menu");
+    let selectedCarColor = "red";
+
+    // Game State
+    const car = { x: canvas.width / 2, y: canvas.height / 2, width: 40, height: 70, speed: 0, angle: 0, bullets: [] };
+    const bullets = [];
+    const policeCars = [];
+    const keys = {};
+    const world = { width: 2000, height: 2000 };
+
+    let policeTimer = 0;
+
+    // Event Listeners
+    document.addEventListener("keydown", (e) => (keys[e.key] = true));
+    document.addEventListener("keyup", (e) => (keys[e.key] = false));
+
+    document.querySelectorAll(".car-option").forEach((option) => {
+        option.addEventListener("click", (e) => {
+            selectedCarColor = e.target.getAttribute("data-color");
+            menu.style.display = "none";
+            startGame();
+        });
+    });
+
+    function startGame() {
+        car.color = selectedCarColor;
+        gameLoop();
+    }
+
+    // Update Car Position
+    function updateCar() {
+        if (keys["ArrowUp"]) car.speed = Math.min(car.speed + 0.1, 5);
+        if (keys["ArrowDown"]) car.speed = Math.max(car.speed - 0.1, -2);
+        if (keys["ArrowLeft"]) car.angle -= 0.05;
+        if (keys["ArrowRight"]) car.angle += 0.05;
+
+        car.speed *= 0.98; // Friction
+        car.x += Math.sin(car.angle) * car.speed;
+        car.y -= Math.cos(car.angle) * car.speed;
+
+        // Keep car in bounds
+        car.x = Math.max(0, Math.min(world.width, car.x));
+        car.y = Math.max(0, Math.min(world.height, car.y));
+    }
+
+    // Shoot Bullets
+    function shoot() {
+        const bulletSpeed = 10;
+        const bullet = {
+            x: car.x + Math.sin(car.angle) * 30,
+            y: car.y - Math.cos(car.angle) * 30,
+            angle: car.angle,
+            speed: bulletSpeed,
+        };
+        bullets.push(bullet);
+    }
+
+    // Update Bullets
+    function updateBullets() {
+        bullets.forEach((bullet, index) => {
+            bullet.x += Math.sin(bullet.angle) * bullet.speed;
+            bullet.y -= Math.cos(bullet.angle) * bullet.speed;
+
+            // Remove bullets that go off-screen
+            if (bullet.x < 0 || bullet.x > world.width || bullet.y < 0 || bullet.y > world.height) {
+                bullets.splice(index, 1);
+            }
+        });
+    }
+
+    // Spawn Police Cars
+    function spawnPolice() {
+        const policeCar = {
+            x: Math.random() * world.width,
+            y: Math.random() * world.height,
+            width: 40,
+            height: 70,
+            speed: 2,
+            angle: 0,
+            color: "blue",
+        };
+        policeCars.push(policeCar);
+    }
+
+    // Update Police Cars
+    function updatePolice() {
+        policeCars.forEach((police) => {
+            const dx = car.x - police.x;
+            const dy = car.y - police.y;
+            police.angle = Math.atan2(dy, dx);
+            police.x += Math.cos(police.angle) * police.speed;
+            police.y += Math.sin(police.angle) * police.speed;
+        });
+    }
+
+    // Draw Everything
+    function drawWorld() {
+        ctx.fillStyle = "#228B22";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawCar() {
+        ctx.save();
+        ctx.translate(car.x, car.y);
+        ctx.rotate(car.angle);
+        ctx.fillStyle = car.color;
+        ctx.fillRect(-car.width / 2, -car.height / 2, car.width, car.height);
+        ctx.restore();
+    }
+
+    function drawBullets() {
+        bullets.forEach((bullet) => {
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = "yellow";
+            ctx.fill();
+        });
+    }
+
+    function drawPolice() {
+        policeCars.forEach((police) => {
+            ctx.save();
+            ctx.translate(police.x, police.y);
+            ctx.rotate(police.angle);
+            ctx.fillStyle = police.color;
+            ctx.fillRect(-police.width / 2, -police.height / 2, police.width, police.height);
+            ctx.restore();
+        });
+    }
+
+    // Main Game Loop
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        updateCar();
+        updateBullets();
+        updatePolice();
+
+        drawWorld();
+        drawCar();
+        drawBullets();
+        drawPolice();
+
+        policeTimer++;
+        if (policeTimer > 300) {
+            spawnPolice();
+            policeTimer = 0;
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Shoot on Space Key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === " ") shoot();
+    });
+</script>
+</body>
+</html>
